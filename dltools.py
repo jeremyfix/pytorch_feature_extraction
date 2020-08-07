@@ -219,6 +219,7 @@ if __name__ == '__main__':
                         help="Whether or not to check the accuracy on the valid set")
     parser.add_argument('--model_name',
                         type=str,
+                        required=True,
                         help='''Which model to use. Must be one of the
                         PyTorch_CIFAR10 repository (see PyTorch_CIFAR10/cifar10_module.py:get_classifier to see all the
                        available models)''')
