@@ -56,6 +56,7 @@ class Activations(object):
     def __init__(self, model):
         self.model = model
         self.activations = {}
+        self.labels = None
 
     def register_hooks(self, module_idx):
         modules = list(self.model.modules())
@@ -81,6 +82,7 @@ class Activations(object):
 
     def __call__(self, data):
         self.activations = {'input': None}
+        self.labels = None
         if isinstance(data, torch.Tensor):
             # We consider this is a single image
             vect_inputs = data.reshape(data.shape[0], -1)
@@ -89,7 +91,8 @@ class Activations(object):
         elif isinstance(data, torch.utils.data.dataloader.DataLoader):
             # We consider this is a DataLoader
             for batch in tqdm.tqdm(data):
-                inputs, _ = batch
+                inputs, labels = batch
+                logging.info("Labels : {}".format(labels))
                 # Forward propagate, the activations are saved thanks to
                 # the hook defined beforehand
                 # vect_inputs = inputs.reshape(inputs.shape[0], -1)
@@ -98,10 +101,14 @@ class Activations(object):
                 else:
                     self.activations['input'] = torch.cat((self.activations['input'],
                                                            inputs), dim=0)
+                if self.labels is None:
+                    self.labels = labels.detach()
+                else:
+                    self.labels = torch.cat((self.labels, labels.detach()), dim=0)
                 self.model(inputs)
         else:
             raise Exception("What should I do with a {}".format(type(data)))
-        return self.activations
+        return self.activations, self.labels
 
 
 def train_val_loaders(batch_size, num_workers, dataset_dir):
@@ -176,7 +183,7 @@ def main(args):
         if args.image is None:
 
             logging.info("Forward propagate the validation data")
-            valid_acts = activations(validloader)
+            valid_acts, valid_labels = activations(validloader)
 
         else:
             # Process a single image
@@ -184,14 +191,19 @@ def main(args):
             input_image = Image.open(args.image)
             input_tensor = CIFAR10_transform(input_image)
             input_batch = input_tensor.unsqueeze(0)  # adds Batch dim
-            valid_acts = activations(input_batch)
+            valid_acts, valid_labels = activations(input_batch)
         # Valid_acts is a dictionnary with the inputs and the features
         # of one (--sequential) or several intermediate layers
         # The values of the dictionnary are torch.Tensor with one row 
         # if --sequential or 10000 rows (the number of validation data
         # in the CIFAR 10 dataset)
         datafile_prefix = 'image_' if args.image is not None else 'cifar10_'
+
         datafile_prefix += args.model_name + '_'
+        # Save the labels once for all
+        with open("{}{}.npy".format(datafile_prefix), 'wb') as f:
+            np.save(f, valid_labels.numpy())
+        # And save all the activations now
         for k, v in valid_acts.items():
             # We should save the input only once
             if v == 'input':
