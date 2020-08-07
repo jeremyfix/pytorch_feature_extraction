@@ -31,10 +31,10 @@ perform one forward pass per intermediate layer preventing to store all the inte
 
 # Example usage 
 
-For example, to save the features of the modules 5, 35, 67, 139 of a `mobilenet_v2`, processing the image `coq.png`
+For example, to save the features of the modules 5, 35, 67, 139, 212 of a `mobilenet_v2` (212 being the last linear layer), processing the image `coq.png`
 
-    python3 dltools.py --model_name mobilenet_v2 --modules_idx 5 35 67 139 --image coq.png 
+    python3 dltools.py --model_name mobilenet_v2 --modules_idx 5 35 67 139 212 --image coq.png 
 
-For example, to save the features of the last linear layer of a `googlenet`, processing the while CIFAR-10 validation set :
+For example, to save the features of the `maxpool3`, `maxpool4` and last linear linear layer of a `googlenet`, processing the while CIFAR-10 validation set :
 
-    python3 dltools.py --model_name googlenet --modules_idx 215  
+    python3 dltools.py --model_name googlenet --modules_idx 50  166 215  

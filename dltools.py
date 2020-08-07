@@ -68,7 +68,7 @@ class Activations(object):
     def print_modules(self):
         for i, m in enumerate(self.model.modules()):
             if is_module_base_layer(m):
-                print("Module {} : {}".format(i, m))
+                print("Module {} ({}): {}".format(i, type(m), m))
 
     def make_hook(self, module_name):
         def hook(model, inputs, outputs):
@@ -190,7 +190,7 @@ def main(args):
         # The values of the dictionnary are torch.Tensor with one row 
         # if --sequential or 10000 rows (the number of validation data
         # in the CIFAR 10 dataset)
-        datafile_prefix = 'image_' if args.sequential else 'cifar10_'
+        datafile_prefix = 'image_' if args.image is not None else 'cifar10_'
         datafile_prefix += args.model_name + '_'
         for k, v in valid_acts.items():
             # We should save the input only once
