@@ -21,7 +21,10 @@ Then you can process a single image with
 
 Or the whole CIFAR-10 validation dataset
 
-    python3 dltools.py --image path/to/an/image
+    python3 dltools.py 
+
+By default, it is going to process `mobilenet_v2` (the one of PyTorch_CIFAR10) with a batch_size of 128. The features of
+the modules 5, 35, 67, 139 and 212 are saved in numpy `npy` files.
 
 If your CPU/GPU has not enough memory, you should also consider passing in the `--sequential` flag which is going to
 perform one forward pass per intermediate layer preventing to store all the intermediate layers in memory.
