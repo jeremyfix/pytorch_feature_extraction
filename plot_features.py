@@ -4,6 +4,7 @@
 import logging
 logging.basicConfig(level=logging.INFO)
 import sys
+import copy
 # External modules
 import matplotlib
 import matplotlib.pyplot as plt
@@ -34,15 +35,12 @@ def main():
     img.reshape(-1)[:size] = data[::]
     img = np.clip(img, 0, 1)
 
-    cmap = matplotlib.cm.get_cmap()
+    cmap = copy.copy(matplotlib.cm.get_cmap())
     cmap.set_bad(color='white')
 
     plt.figure()
     plt.imshow(img)
-    plt.tick_params(axis='both', which='both',
-                    bottom=False, top=False, left=False, right=False,
-                    labelbottom=False, labelleft=False)
-
+    plt.gca().axis('off')
     filename = '{}.png'.format(sys.argv[1][:-4])
     plt.savefig(filename, bbox_inches='tight')
     logging.info("{} saved".format(filename))
