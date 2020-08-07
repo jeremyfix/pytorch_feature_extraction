@@ -30,15 +30,10 @@ from torch.utils.data import DataLoader
 from PyTorch_CIFAR10 import cifar10_models
 # from PyTorch_CIFAR10 import cifar10_module
 
-# model_name = 'mobilenet_v2'
-NUM_WORKERS = 6
-BATCH_SIZE = 128
-DATADIR = '/opt/Datasets/'
 mean = [0.4914, 0.4822, 0.4465]
 std = [0.2023, 0.1994, 0.2010]
 CIFAR10_transform = transforms.Compose([transforms.ToTensor(),
                                         transforms.Normalize(mean, std)])
-modules_idx = {'mobilenet_v2': [5, 35, 67, 139, 212], 'googlenet': [4, 5]}
 
 def load_model(model_name):
     model = getattr(cifar10_models, model_name)()
@@ -109,22 +104,22 @@ class Activations(object):
         return self.activations
 
 
-def train_val_loaders():
+def train_val_loaders(batch_size, num_workers, dataset_dir):
     train_dataset = CIFAR10(download=True,
-                            root=DATADIR,
+                            root=dataset_dir,
                             train=True,
                             transform=CIFAR10_transform)
     trainloader = DataLoader(train_dataset,
-                             batch_size=BATCH_SIZE,
-                             num_workers=NUM_WORKERS,
+                             batch_size=batch_size,
+                             num_workers=num_workers,
                              pin_memory=True)
     valid_dataset = CIFAR10(download=True,
-                            root=DATADIR,
+                            root=dataset_dir,
                             train=False,
                             transform=CIFAR10_transform)
     validloader = DataLoader(valid_dataset,
-                             batch_size=BATCH_SIZE,
-                             num_workers=NUM_WORKERS,
+                             batch_size=batch_size,
+                             num_workers=num_workers,
                              pin_memory=True)
     return trainloader, validloader
 
@@ -150,7 +145,9 @@ def main(args):
 
     if args.check_accuracy or args.image is None:
         logging.info("Loading the CIFAR-10 data")
-        trainloader, validloader = train_val_loaders()
+        trainloader, validloader = train_val_loaders(args.batch_size,
+                                                     args.num_workers,
+                                                     args.dataset_dir)
 
     if args.check_accuracy:
         logging.info("Checking the accuracies")
@@ -163,7 +160,7 @@ def main(args):
     logging.info("Listing the modules on which to possibly anchor a hook")
     activations.print_modules()
 
-    hooks = modules_idx[args.model_name].copy()
+    hooks = args.modules_idx
     save_input = True
 
     while len(hooks) != 0:
@@ -214,6 +211,22 @@ if __name__ == '__main__':
                                      CIFAR 10 datasets and saves some of the
                                      intermediate features
                                      ''')
+    parser.add_argument('--batch_size',
+                        type=int,
+                        help='The batch size',
+                        default=128
+                       )
+    parser.add_argument('--num_workers',
+                        type=int,
+                        help='The number of workers for the dataloaders',
+                        default=6
+                       )
+    parser.add_argument('--dataset_dir',
+                        type=str,
+                        help='The path to store the CIFAR10 dataset',
+                        default='/opt/Datasets'
+                       )
+
     parser.add_argument('--check_accuracy',
                         action="store_true",
                         help="Whether or not to check the accuracy on the valid set")
@@ -221,8 +234,15 @@ if __name__ == '__main__':
                         type=str,
                         required=True,
                         help='''Which model to use. Must be one of the
-                        PyTorch_CIFAR10 repository (see PyTorch_CIFAR10/cifar10_module.py:get_classifier to see all the
-                       available models)''')
+                        PyTorch_CIFAR10 repository (see 
+                        PyTorch_CIFAR10/cifar10_module.py:get_classifier 
+                        to see all the available models)''')
+    parser.add_argument('--modules_idx', nargs='+',
+                        type=int,
+                        required=True,
+                        help='''Which modules idx to save. These are the 
+                        indices shown in the console''')
+
     parser.add_argument('--sequential',
                         action="store_true",
                         help='''Whether or not to process sequentially
