@@ -38,3 +38,5 @@ For example, to save the features of the modules 5, 35, 67, 139, 212 of a `mobil
 For example, to save the features of the `maxpool3`, `maxpool4` and last linear linear layer of a `googlenet`, processing the while CIFAR-10 validation set :
 
     python3 dltools.py --model_name googlenet --modules_idx 50  166 215  
+
+Note the validation data are shuffled the first labels being 3, 8, 8, 0, 6, 6, ... ;If you do not need the whole dataset, you can process the first validation samples of CIFAR-10 by specifying the `--size` option.
