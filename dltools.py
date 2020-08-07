@@ -80,7 +80,7 @@ class Activations(object):
                 self.activations[module_name] = torch.cat((self.activations[module_name], outputs.detach()), dim=0)
         return hook
 
-    def __call__(self, data):
+    def __call__(self, data, size):
         self.activations = {'input': None}
         self.labels = None
         if isinstance(data, torch.Tensor):
@@ -90,8 +90,10 @@ class Activations(object):
             self.model(data)
         elif isinstance(data, torch.utils.data.dataloader.DataLoader):
             # We consider this is a DataLoader
+            n_samples = 0
             for batch in tqdm.tqdm(data):
                 inputs, labels = batch
+                n_samples += inputs.shape[0]
                 logging.info("Labels : {}".format(labels))
                 # Forward propagate, the activations are saved thanks to
                 # the hook defined beforehand
@@ -106,6 +108,8 @@ class Activations(object):
                 else:
                     self.labels = torch.cat((self.labels, labels.detach()), dim=0)
                 self.model(inputs)
+                if size is not None and n_samples > size:
+                    break
         else:
             raise Exception("What should I do with a {}".format(type(data)))
         return self.activations, self.labels
@@ -183,7 +187,7 @@ def main(args):
         if args.image is None:
 
             logging.info("Forward propagate the validation data")
-            valid_acts, valid_labels = activations(validloader)
+            valid_acts, valid_labels = activations(validloader, args.size)
 
         else:
             # Process a single image
@@ -201,7 +205,7 @@ def main(args):
 
         datafile_prefix += args.model_name + '_'
         # Save the labels once for all
-        with open("{}{}.npy".format(datafile_prefix), 'wb') as f:
+        with open("{}labels.npy".format(datafile_prefix), 'wb') as f:
             np.save(f, valid_labels.numpy())
         # And save all the activations now
         for k, v in valid_acts.items():
@@ -223,6 +227,11 @@ if __name__ == '__main__':
                                      CIFAR 10 datasets and saves some of the
                                      intermediate features
                                      ''')
+    parser.add_argument('--size',
+                        type=int,
+                        help='The maximum number of elements to save',
+                        default=None
+                       )
     parser.add_argument('--batch_size',
                         type=int,
                         help='The batch size',
