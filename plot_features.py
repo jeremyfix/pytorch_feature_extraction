@@ -5,6 +5,7 @@ import logging
 logging.basicConfig(level=logging.INFO)
 import sys
 # External modules
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -25,17 +26,22 @@ def main():
     # We build a squared image
     size = data.size
     N = int(np.ceil(np.sqrt(data.size)))
+    logging.info("Feature space size : {}".format(size))
 
     # Fill in the first elements with our data
-    img = np.empty((N, N))
+    img = np.zeros((N, N), dtype=float)
+    img[:] = np.nan
     img.reshape(-1)[:size] = data[::]
+    img = np.clip(img, 0, 1)
+
+    cmap = matplotlib.cm.get_cmap()
+    cmap.set_bad(color='red')
 
     plt.figure()
-    plt.imshow(img, cmap='gray')
+    plt.imshow(img)
     plt.tick_params(axis='both', which='both',
                     bottom=False, top=False, left=False, right=False,
                     labelbottom=False, labelleft=False)
-    plt.tight_layout()
 
     filename = '{}.png'.format(sys.argv[1][:-4])
     plt.savefig(filename, bbox_inches='tight')
