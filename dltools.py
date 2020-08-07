@@ -20,6 +20,8 @@ import itertools
 import logging
 logging.basicConfig(level=logging.INFO)
 # External modules
+from PIL import Image
+import numpy as np
 import tqdm
 import torch
 import torchvision.transforms as transforms
@@ -32,7 +34,10 @@ model_name = 'mobilenet_v2'
 NUM_WORKERS = 6
 BATCH_SIZE = 128
 DATADIR = '/opt/Datasets/'
-
+mean = [0.4914, 0.4822, 0.4465]
+std = [0.2023, 0.1994, 0.2010]
+CIFAR10_transform = transforms.Compose([transforms.ToTensor(),
+                                        transforms.Normalize(mean, std)])
 modules_idx = {'mobilenet_v2': [5, 35, 67, 139, 212], 'googlenet': [4, 5]}
 
 def load_model(model_name):
@@ -59,8 +64,8 @@ class Activations(object):
 
     def register_hooks(self, module_idx):
         modules = list(self.model.modules())
-        # for idx in module_idx:
-        self.hook = modules[module_idx].register_forward_hook(self.make_hook("module_{}".format(module_idx)))
+        for idx in module_idx:
+            self.hook = modules[idx].register_forward_hook(self.make_hook("module_{}".format(idx)))
 
     def clean_hooks(self):
         self.hook.remove()
@@ -72,41 +77,43 @@ class Activations(object):
 
     def make_hook(self, module_name):
         def hook(model, inputs, outputs):
-            vec_outputs = outputs.reshape(outputs.shape[0], -1)
+            # vec_outputs = outputs.reshape(outputs.shape[0], -1)
             if module_name not in self.activations:
-                self.activations[module_name] = vec_outputs.detach()
+                self.activations[module_name] = outputs.detach()
             else:
-                self.activations[module_name] = torch.cat((self.activations[module_name], vec_outputs.detach()), dim=0)
+                self.activations[module_name] = torch.cat((self.activations[module_name], outputs.detach()), dim=0)
         return hook
 
     def __call__(self, data):
         self.activations = {'input': None}
-        if isinstance(data, torch.tensor):
-            logging.info("Got a tensor")
-            
-        for batch in tqdm.tqdm(data):
-            inputs, _ = batch
-            # Forward propagate, the activations are saved thanks to
-            # the hook defined beforehand
-            vect_inputs = inputs.reshape(inputs.shape[0], -1)
-            if self.activations['input'] is None:
-                self.activations['input'] = vect_inputs
-            else:
-                self.activations['input'] = torch.cat((self.activations['input'],
-                                                       vect_inputs), dim=0)
-            self.model(inputs)
+        if isinstance(data, torch.Tensor):
+            # We consider this is a single image
+            vect_inputs = data.reshape(data.shape[0], -1)
+            self.activations['input'] = vect_inputs
+            self.model(data)
+        elif isinstance(data, torch.utils.data.dataloader.DataLoader):
+            # We consider this is a DataLoader
+            for batch in tqdm.tqdm(data):
+                inputs, _ = batch
+                # Forward propagate, the activations are saved thanks to
+                # the hook defined beforehand
+                # vect_inputs = inputs.reshape(inputs.shape[0], -1)
+                if self.activations['input'] is None:
+                    self.activations['input'] = inputs.detach()
+                else:
+                    self.activations['input'] = torch.cat((self.activations['input'],
+                                                           inputs), dim=0)
+                self.model(inputs)
+        else:
+            raise Exception("What should I do with a {}".format(type(data)))
         return self.activations
 
 
 def train_val_loaders():
-    mean = [0.4914, 0.4822, 0.4465]
-    std = [0.2023, 0.1994, 0.2010]
-    transform = transforms.Compose([transforms.ToTensor(),
-                                    transforms.Normalize(mean, std)])
     train_dataset = CIFAR10(download=True,
                             root=DATADIR,
                             train=True,
-                            transform=transform)
+                            transform=CIFAR10_transform)
     trainloader = DataLoader(train_dataset,
                              batch_size=BATCH_SIZE,
                              num_workers=NUM_WORKERS,
@@ -114,7 +121,7 @@ def train_val_loaders():
     valid_dataset = CIFAR10(download=True,
                             root=DATADIR,
                             train=False,
-                            transform=transform)
+                            transform=CIFAR10_transform)
     validloader = DataLoader(valid_dataset,
                              batch_size=BATCH_SIZE,
                              num_workers=NUM_WORKERS,
@@ -133,12 +140,10 @@ def check_accuracy(model, loader):
         ncorrect += num_correct
     return ncorrect / float(nsamples)
 
-def main(idx=None):
+def main(args):
     '''
     Main function for testing the module
     '''
-    logging.info("Loading the CIFAR-10 data")
-    trainloader, validloader = train_val_loaders()
 
     logging.info("Loading the pretrained model")
     model = load_model(model_name)
@@ -153,24 +158,63 @@ def main(idx=None):
     logging.info("Listing the modules on which to possibly anchor a hook")
     activations.print_modules()
 
-    logging.info("Registering the hooks")
-    activations.register_hooks(modules_idx[model_name][0])
+    hooks = modules_idx[model_name].copy()
+    save_input = True
 
-    activations.clean_hooks()
-    if idx is None:
-        logging.info("Forward propagate the validation data")
-        valid_acts = activations(validloader)
-        print(valid_acts['module_5'].shape)
-    else:
-        # Process a single image
-        logging.info("Processing image {}".format(idx))
-        img, label = validloader.dataset[0]
-        img_activations = activations(img)
-        print(label)
+    while len(hooks) != 0:
+
+        if args.sequential:
+            logging.info("Registering the hook at module {}".format(hooks[0]))
+            activations.register_hooks([hooks.pop(0)])
+        else:
+            logging.info("Registering the hook at modules {}".format(",".join(map(str, hooks))))
+            activations.register_hooks(hooks)
+            hooks.clear()
+
+        if args.image is None:
+            logging.info("Loading the CIFAR-10 data")
+            trainloader, validloader = train_val_loaders()
+
+            logging.info("Forward propagate the validation data")
+            valid_acts = activations(validloader)
+
+        else:
+            # Process a single image
+            logging.info("Processing image {}".format(args.image))
+            input_image = Image.open(args.image)
+            input_tensor = CIFAR10_transform(input_image)
+            input_batch = input_tensor.unsqueeze(0)  # adds Batch dim
+            valid_acts = activations(input_batch)
+        # Valid_acts is a dictionnary with the inputs and the features
+        # of one (--sequential) or several intermediate layers
+        # The values of the dictionnary are torch.Tensor with one row 
+        # if --sequential or 10000 rows (the number of validation data
+        # in the CIFAR 10 dataset)
+        datafile_prefix = 'image_' if args.sequential else 'cifar10_'
+        for k, v in valid_acts.items():
+            logging.info("Saving {} of size {}".format(k, v.shape))
+            with open("{}{}.npy".format(datafile_prefix, k), 'wb') as f:
+                np.save(f, v.numpy())
+        activations.clean_hooks()
 
 if __name__ == '__main__':
-    # Process one image for illustration
-    main(0)
 
-    # Process the whole dataset
-    # main()
+    parser = argparse.ArgumentParser(description='''
+                                     Forward propagate an image or the whole
+                                     CIFAR 10 datasets and saves some of the
+                                     intermediate features
+                                     ''')
+    parser.add_argument('--sequential',
+                        action="store_true",
+                        help='''Whether or not to process sequentially
+                        all the layers. For low memory
+                        systems, this option should be on''')
+    parser.add_argument('--image',
+                        type=str,
+                        default=None,
+                        help='''The path to an image if a single image should be
+                        be processed''')
+
+    args = parser.parse_args()
+   
+    main(args)
