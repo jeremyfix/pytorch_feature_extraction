@@ -148,11 +148,16 @@ def main(args):
     logging.info("Loading the pretrained model")
     model = load_model(model_name)
 
-    logging.info("Checking the accuracies")
-    # tacc = 100 * check_accuracy(model, trainloader)
-    # vacc = 100 * check_accuracy(model, validloader)
-    # logging.info("Accuracies : Training({:.2f} %), Test({:.2f} %)".format(tacc,
-                                                                          # vacc))
+    if args.check_accuracy or args.image is None:
+        logging.info("Loading the CIFAR-10 data")
+        trainloader, validloader = train_val_loaders()
+
+    if args.check_accuracy:
+        logging.info("Checking the accuracies")
+        tacc = 100 * check_accuracy(model, trainloader)
+        vacc = 100 * check_accuracy(model, validloader)
+        logging.info("Accuracies : Training({:.2f} %), Test({:.2f} %)".format(tacc,
+                                                                          vacc))
     activations = Activations(model)
 
     logging.info("Listing the modules on which to possibly anchor a hook")
@@ -172,8 +177,6 @@ def main(args):
             hooks.clear()
 
         if args.image is None:
-            logging.info("Loading the CIFAR-10 data")
-            trainloader, validloader = train_val_loaders()
 
             logging.info("Forward propagate the validation data")
             valid_acts = activations(validloader)
@@ -192,6 +195,12 @@ def main(args):
         # in the CIFAR 10 dataset)
         datafile_prefix = 'image_' if args.sequential else 'cifar10_'
         for k, v in valid_acts.items():
+            # We should save the input only once
+            if v == 'input':
+                if not save_input:
+                    continue
+                save_input = False
+            #
             logging.info("Saving {} of size {}".format(k, v.shape))
             with open("{}{}.npy".format(datafile_prefix, k), 'wb') as f:
                 np.save(f, v.numpy())
@@ -204,6 +213,9 @@ if __name__ == '__main__':
                                      CIFAR 10 datasets and saves some of the
                                      intermediate features
                                      ''')
+    parser.add_argument('--check_accuracy',
+                        action="store_true",
+                        help="Whether or not to check the accuracy on the valid set")
     parser.add_argument('--sequential',
                         action="store_true",
                         help='''Whether or not to process sequentially
