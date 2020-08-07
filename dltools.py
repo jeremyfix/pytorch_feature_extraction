@@ -94,7 +94,6 @@ class Activations(object):
             for batch in tqdm.tqdm(data):
                 inputs, labels = batch
                 n_samples += inputs.shape[0]
-                logging.info("Labels : {}".format(labels))
                 # Forward propagate, the activations are saved thanks to
                 # the hook defined beforehand
                 # vect_inputs = inputs.reshape(inputs.shape[0], -1)
