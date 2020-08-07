@@ -28,3 +28,13 @@ the modules 5, 35, 67, 139 and 212 are saved in numpy `npy` files.
 
 If your CPU/GPU has not enough memory, you should also consider passing in the `--sequential` flag which is going to
 perform one forward pass per intermediate layer preventing to store all the intermediate layers in memory.
+
+# Example usage 
+
+For example, to save the features of the modules 5, 35, 67, 139 of a `mobilenet_v2`, processing the image `coq.png`
+
+    python3 dltools.py --model_name mobilenet_v2 --modules_idx 5 35 67 139 --image coq.png 
+
+For example, to save the features of the last linear layer of a `googlenet`, processing the while CIFAR-10 validation set :
+
+    python3 dltools.py --model_name googlenet --modules_idx 215  
