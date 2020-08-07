@@ -19,6 +19,7 @@ import argparse
 import itertools
 import logging
 logging.basicConfig(level=logging.INFO)
+import sys
 # External modules
 from PIL import Image
 import numpy as np
@@ -36,7 +37,7 @@ CIFAR10_transform = transforms.Compose([transforms.ToTensor(),
                                         transforms.Normalize(mean, std)])
 
 def load_model(model_name):
-    model = getattr(cifar10_models, model_name)()
+    model = getattr(cifar10_models, model_name)(pretrained=True)
     model.eval()
     return model
 
@@ -165,6 +166,8 @@ def main(args):
         vacc = 100 * check_accuracy(model, validloader)
         logging.info("Accuracies : Training({:.2f} %), Test({:.2f} %)".format(tacc,
                                                                           vacc))
+        sys.exit(0)
+
     activations = Activations(model)
 
     logging.info("Listing the modules on which to possibly anchor a hook")
