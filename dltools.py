@@ -14,11 +14,13 @@ From there, you need to download the pretrained models :
 '''
 
 
+# Standard modules
+import argparse
 import itertools
-import inspect
-import tqdm
 import logging
 logging.basicConfig(level=logging.INFO)
+# External modules
+import tqdm
 import torch
 import torchvision.transforms as transforms
 from torchvision.datasets import CIFAR10
