@@ -194,7 +194,7 @@ def main(args):
             input_image = Image.open(args.image)
             input_tensor = CIFAR10_transform(input_image)
             input_batch = input_tensor.unsqueeze(0)  # adds Batch dim
-            valid_acts, valid_labels = activations(input_batch)
+            valid_acts, valid_labels = activations(input_batch, args.size)
         # Valid_acts is a dictionnary with the inputs and the features
         # of one (--sequential) or several intermediate layers
         # The values of the dictionnary are torch.Tensor with one row 
@@ -204,8 +204,9 @@ def main(args):
 
         datafile_prefix += args.model_name + '_'
         # Save the labels once for all
-        with open("{}labels.npy".format(datafile_prefix), 'wb') as f:
-            np.save(f, valid_labels.numpy())
+        if valid_labels is not None:
+            with open("{}labels.npy".format(datafile_prefix), 'wb') as f:
+                np.save(f, valid_labels.numpy())
         # And save all the activations now
         for k, v in valid_acts.items():
             # We should save the input only once
