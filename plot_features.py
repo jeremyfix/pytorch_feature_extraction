@@ -35,7 +35,7 @@ def main():
     img = np.clip(img, 0, 1)
 
     cmap = matplotlib.cm.get_cmap()
-    cmap.set_bad(color='red')
+    cmap.set_bad(color='white')
 
     plt.figure()
     plt.imshow(img)
